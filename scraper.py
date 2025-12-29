@@ -164,7 +164,8 @@ def collect_reviews(driver):
 
 def collect_testimonials(driver):
     """
-    Scrape testimonial cards using infinite scroll.
+    Scrape testimonials while scrolling.
+    New testimonials are collected after each scroll step.
     """
     print("\n💬 Collecting TESTIMONIALS...")
     testimonials = []
@@ -175,6 +176,31 @@ def collect_testimonials(driver):
     last_height = driver.execute_script("return document.body.scrollHeight")
 
     while True:
+        # Collect currently visible testimonial cards
+        cards = driver.find_elements(By.CSS_SELECTOR, "div[class*='testimonial']")
+
+        for card in cards:
+            try:
+                text = card.text.replace("\n", " ").strip()
+
+                if (
+                    "Take a look" in text
+                    or "collection" in text
+                    or len(text) < 10
+                    or len(text) > 400
+                ):
+                    continue
+
+                if not any(t["text"] == text for t in testimonials):
+                    testimonials.append({
+                        "text": text,
+                        "rating": extract_star_rating(card) or 5
+                    })
+
+            except Exception:
+                continue
+
+        # Scroll down to load more testimonials
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         time.sleep(2)
 
@@ -183,31 +209,9 @@ def collect_testimonials(driver):
             break
         last_height = new_height
 
-    cards = driver.find_elements(By.CSS_SELECTOR, "div[class*='testimonial']")
-
-    for card in cards:
-        try:
-            text = card.text.replace("\n", " ").strip()
-
-            if (
-                "Take a look" in text
-                or "collection" in text
-                or len(text) < 10
-                or len(text) > 400
-            ):
-                continue
-
-            if not any(t["text"] == text for t in testimonials):
-                testimonials.append({
-                    "text": text,
-                    "rating": extract_star_rating(card) or 5
-                })
-
-        except Exception:
-            continue
-
     print(f"   ✅ Total testimonials collected: {len(testimonials)}")
     return testimonials
+
 
 
 def run_scraper():
