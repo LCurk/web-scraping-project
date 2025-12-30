@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import json
-from transformers import pipeline
 
 # -------------------------------------------------
 # Page configuration
@@ -34,18 +33,6 @@ reviews_df["date"] = pd.to_datetime(reviews_df["date"])
 reviews_df["month"] = reviews_df["date"].dt.strftime("%b %Y")
 
 # -------------------------------------------------
-# Load Transformer sentiment model
-# -------------------------------------------------
-@st.cache_resource
-def load_sentiment_model():
-    return pipeline(
-        "sentiment-analysis",
-        model="distilbert-base-uncased-finetuned-sst-2-english"
-    )
-
-sentiment_model = load_sentiment_model()
-
-# -------------------------------------------------
 # Sidebar navigation
 # -------------------------------------------------
 st.sidebar.header("Navigation")
@@ -61,7 +48,7 @@ section = st.sidebar.radio(
 if section == "Products":
     st.subheader("🛍 Products")
 
-    products_df["price"] = products_df["price"].str.strip()
+    products_df["price"] = products_df["price"].astype(str).str.strip()
 
     st.dataframe(
         products_df,
@@ -80,10 +67,10 @@ elif section == "Testimonials":
     )
 
 # -------------------------------------------------
-# REVIEWS + SENTIMENT + CHARTS
+# REVIEWS + PRECOMPUTED SENTIMENT
 # -------------------------------------------------
 elif section == "Reviews":
-    st.subheader("⭐ Reviews – Month Filter & Sentiment Analysis (2023)")
+    st.subheader("⭐ Reviews – Month Filter & Sentiment Analysis (precomputed)")
 
     # Ordered months
     months_2023 = (
@@ -108,17 +95,8 @@ elif section == "Reviews":
         st.info("No reviews found for this month.")
     else:
         # -----------------------------
-        # Sentiment analysis
-        # -----------------------------
-        texts = filtered_reviews["text"].tolist()
-        results = sentiment_model(texts)
-
-        filtered_reviews = filtered_reviews.copy()
-        filtered_reviews["sentiment"] = [r["label"] for r in results]
-        filtered_reviews["confidence"] = [round(r["score"], 3) for r in results]
-
-        # -----------------------------
         # Reviews table
+        # (sentiment already exists)
         # -----------------------------
         st.dataframe(
             filtered_reviews[
@@ -176,7 +154,7 @@ elif section == "Reviews":
         st.bar_chart(chart_df["count"])
 
         # -----------------------------
-        # Average confidence (Advanced)
+        # Average confidence
         # -----------------------------
         st.markdown("### 🧠 Model Confidence (Average)")
         st.dataframe(
