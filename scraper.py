@@ -8,6 +8,19 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
+# 🔹 NOVO: sentiment
+from transformers import pipeline
+
+
+# -------------------------------------------------
+# Sentiment model – load ONCE
+# -------------------------------------------------
+print("🧠 Loading sentiment model...")
+sentiment_model = pipeline(
+    "sentiment-analysis",
+    model="distilbert-base-uncased-finetuned-sst-2-english"
+)
+
 
 def extract_star_rating(container):
     """
@@ -87,6 +100,7 @@ def collect_reviews(driver):
     """
     Scrape reviews dynamically loaded via 'Load more' button.
     Stops once reviews older than 2023 are reached.
+    Adds SENTIMENT + CONFIDENCE.
     """
     print("\n⭐ Collecting REVIEWS (2023 and newer)...")
     reviews_data = []
@@ -125,12 +139,19 @@ def collect_reviews(driver):
                 review_text = max(lines, key=len)
                 rating = extract_star_rating(block) or 5
 
-                if not any(r["text"] == review_text for r in reviews_data):
-                    reviews_data.append({
-                        "date": review_date,
-                        "text": review_text,
-                        "rating": rating
-                    })
+                if any(r["text"] == review_text for r in reviews_data):
+                    continue
+
+                # 🔹 NOVO: sentiment analiza (OFFLINE)
+                sentiment_result = sentiment_model(review_text)[0]
+
+                reviews_data.append({
+                    "date": review_date,
+                    "text": review_text,
+                    "rating": rating,
+                    "sentiment": sentiment_result["label"],
+                    "confidence": round(sentiment_result["score"], 3)
+                })
 
             except Exception:
                 continue
@@ -176,7 +197,6 @@ def collect_testimonials(driver):
     last_height = driver.execute_script("return document.body.scrollHeight")
 
     while True:
-        # Collect currently visible testimonial cards
         cards = driver.find_elements(By.CSS_SELECTOR, "div[class*='testimonial']")
 
         for card in cards:
@@ -200,7 +220,6 @@ def collect_testimonials(driver):
             except Exception:
                 continue
 
-        # Scroll down to load more testimonials
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         time.sleep(2)
 
@@ -211,7 +230,6 @@ def collect_testimonials(driver):
 
     print(f"   ✅ Total testimonials collected: {len(testimonials)}")
     return testimonials
-
 
 
 def run_scraper():
